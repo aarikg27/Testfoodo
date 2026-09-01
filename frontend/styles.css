@@ -727,6 +727,50 @@ svg {
   border-color: var(--line);
 }
 
+.menu-filter-tools {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.station-field {
+  position: relative;
+}
+
+.station-field::after {
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  content: "";
+  pointer-events: none;
+  transform: translateY(-70%) rotate(45deg);
+}
+
+.station-field select {
+  width: 190px;
+  min-height: 42px;
+  padding: 0 34px 0 13px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  outline: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  appearance: none;
+}
+
+.station-field select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(23, 132, 91, 0.1);
+}
+
 .search-field {
   display: flex;
   align-items: center;
@@ -1524,7 +1568,8 @@ button:disabled {
   .filter-bar { align-items: stretch; flex-direction: column; }
   .meal-tabs { justify-content: space-between; }
   .meal-tab { flex: 1; padding-inline: 6px; }
-  .search-field { width: 100%; }
+  .menu-filter-tools { align-items: stretch; flex-direction: column; }
+  .station-field select, .search-field { width: 100%; }
   .food-grid { grid-template-columns: 1fr; }
   .collection-card { min-height: 240px; }
   .goal-fields, .choice-grid { grid-template-columns: 1fr 1fr; }
@@ -1542,4 +1587,3 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
-

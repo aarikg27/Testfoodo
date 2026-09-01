@@ -27,6 +27,7 @@ from ..schemas import (
     MenuDateResponse,
     PaginatedFoods,
     ScrapeStatusResponse,
+    StationResponse,
 )
 
 router = APIRouter(tags=["menu"])
@@ -159,7 +160,9 @@ def menu_statement(
     if meal:
         statement = statement.where(func.lower(MenuAvailability.meal_period) == meal.lower())
     if station:
-        statement = statement.where(func.lower(Station.name).like(f"%{station.lower()}%"))
+        statement = statement.where(
+            func.lower(Station.name) == station.strip().lower()
+        )
     if search:
         statement = statement.where(func.lower(Food.name).like(f"%{search.lower()}%"))
     for label in {item.strip().lower() for item in dietary if item.strip()}:
@@ -275,6 +278,49 @@ async def list_foods(
         menu_date=menu_date,
         last_scraped_at=as_utc(last_scraped),
     )
+
+
+@router.get("/stations", response_model=list[StationResponse])
+async def list_stations(
+    hall: str | None = None,
+    menu_date: date = Query(default_factory=eastern_today, alias="date"),
+    meal: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    meal = effective_meal(menu_date, meal)
+    statement = (
+        select(
+            func.min(Station.id).label("id"),
+            Station.name,
+            func.count(MenuAvailability.id).label("item_count"),
+        )
+        .join(MenuAvailability, MenuAvailability.station_id == Station.id)
+        .join(Station.hall)
+        .where(MenuAvailability.menu_date == menu_date)
+    )
+    if hall:
+        hall_value = hall.strip().lower()
+        statement = statement.where(
+            or_(
+                func.lower(DiningHall.slug) == hall_value,
+                func.lower(DiningHall.name) == hall_value,
+                DiningHall.source_id == hall,
+                func.lower(DiningHall.name).like(f"%{hall_value}%"),
+            )
+        )
+    if meal:
+        statement = statement.where(
+            func.lower(MenuAvailability.meal_period) == meal.lower()
+        )
+    rows = (
+        await db.execute(
+            statement.group_by(Station.name).order_by(Station.name)
+        )
+    ).all()
+    return [
+        StationResponse(id=station_id, name=name, item_count=int(item_count))
+        for station_id, name, item_count in rows
+    ]
 
 
 @router.get("/foods/{food_id}", response_model=FoodResponse)

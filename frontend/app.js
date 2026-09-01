@@ -49,9 +49,11 @@ const state = {
   user: null,
   date: localDateString(new Date()),
   hall: localStorage.getItem(STORAGE.hall) || "",
+  station: "",
   meal: currentMeal(),
   search: "",
   halls: [],
+  stations: [],
   menu: [],
   menuTotal: 0,
   lastScrapedAt: null,
@@ -71,6 +73,7 @@ const state = {
 const elements = {
   date: document.querySelector("#date-filter"),
   hall: document.querySelector("#hall-filter"),
+  station: document.querySelector("#station-filter"),
   todayLabel: document.querySelector("#today-label"),
   freshness: document.querySelector("#freshness-status"),
   macroGrid: document.querySelector("#macro-grid"),
@@ -471,6 +474,7 @@ function renderMenu() {
 
 function renderActiveFilters() {
   const filters = [
+    ...(state.station ? [state.station] : []),
     ...state.preferences.dietary_preferences,
     ...state.preferences.excluded_labels.map((item) => `No ${labelText(item)}`),
   ];
@@ -617,6 +621,7 @@ function watchLiveRefresh() {
       await loadMenuContext();
       if (wasRefreshing && state.menuContext.refresh_status !== "refreshing") {
         await loadHalls();
+        await loadStations();
         await Promise.all([loadMenu(), loadRecommendations()]);
         toast("Live UMD menus are up to date");
       }
@@ -636,6 +641,20 @@ async function loadHalls() {
   if (!state.hall) state.hall = state.halls.find((hall) => hall.slug === "yahentamitsi")?.slug || state.halls[0]?.slug || "";
   if (!state.halls.some((hall) => hall.slug === state.hall)) state.hall = "";
   elements.hall.value = state.hall;
+}
+
+async function loadStations() {
+  const params = new URLSearchParams({ date: state.date, meal: state.meal });
+  if (state.hall) params.set("hall", state.hall);
+  state.stations = await api(`/stations?${params}`);
+  if (!state.stations.some((station) => station.name === state.station)) {
+    state.station = "";
+  }
+  elements.station.innerHTML = `<option value="">All stations</option>${state.stations
+    .map((station) => `<option value="${escapeHTML(station.name)}">${escapeHTML(station.name)} · ${formatNumber(station.item_count)}</option>`)
+    .join("")}`;
+  elements.station.value = state.station;
+  renderActiveFilters();
 }
 
 async function loadPersonalData() {
@@ -668,6 +687,7 @@ async function loadMenu() {
   elements.foodGrid.innerHTML = Array.from({ length: 6 }, () => `<div class="skeleton"></div>`).join("");
   const params = new URLSearchParams({ date: state.date, meal: state.meal, limit: "500" });
   if (state.hall) params.set("hall", state.hall);
+  if (state.station) params.set("station", state.station);
   state.preferences.dietary_preferences.forEach((label) => params.append("dietary", label));
   state.preferences.excluded_labels.forEach((label) => params.append("exclude", label));
   try {
@@ -1009,6 +1029,7 @@ async function initialize() {
     await loadMenuContext({ preserveDate: false });
     await loadPersonalData();
     await loadHalls();
+    await loadStations();
     renderAll();
     await Promise.all([loadMenu(), loadRecommendations()]);
     watchLiveRefresh();
@@ -1022,24 +1043,37 @@ document.querySelector("#meal-tabs").addEventListener("click", async (event) => 
   const button = event.target.closest("[data-meal]");
   if (!button || button.disabled) return;
   state.meal = button.dataset.meal;
+  state.station = "";
   document.querySelectorAll(".meal-tab").forEach((item) => item.classList.toggle("active", item === button));
+  await loadStations();
   await Promise.all([loadMenu(), loadRecommendations()]);
 });
 
 elements.date.addEventListener("change", async () => {
   state.date = elements.date.value;
+  state.station = "";
   syncSelectedMeal();
   renderMenuControls();
   await loadPersonalData();
   await loadHalls();
+  await loadStations();
   renderAll();
   await Promise.all([loadMenu(), loadRecommendations()]);
 });
 
 elements.hall.addEventListener("change", async () => {
   state.hall = elements.hall.value;
+  state.station = "";
   localStorage.setItem(STORAGE.hall, state.hall);
+  await loadStations();
   await Promise.all([loadMenu(), loadRecommendations()]);
+});
+
+elements.station.addEventListener("change", async () => {
+  state.station = elements.station.value;
+  state.visibleCount = 12;
+  renderActiveFilters();
+  await loadMenu();
 });
 
 elements.search.addEventListener("input", () => {

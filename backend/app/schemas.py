@@ -42,6 +42,12 @@ class HallResponse(BaseModel):
     item_count: int = 0
 
 
+class StationResponse(BaseModel):
+    id: int
+    name: str
+    item_count: int = 0
+
+
 class FoodResponse(BaseModel):
     id: uuid.UUID
     availability_id: int
@@ -274,4 +280,3 @@ class MenuContextResponse(BaseModel):
     dates: List[MenuDateResponse]
     refresh_status: str
     last_refresh_at: Optional[datetime] = None
-

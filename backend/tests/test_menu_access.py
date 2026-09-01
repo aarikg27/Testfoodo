@@ -2,11 +2,13 @@ from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.dialects import sqlite
 
 from app.routers.foods import (
     current_meal_period,
     eastern_today,
     effective_meal,
+    menu_statement,
     require_current_or_future,
 )
 
@@ -30,3 +32,17 @@ def test_today_is_limited_to_the_current_meal_period():
     assert effective_meal(eastern_today()) == current
     with pytest.raises(HTTPException):
         effective_meal(eastern_today(), other)
+
+
+def test_station_filter_uses_an_exact_case_insensitive_match():
+    statement = menu_statement(
+        menu_date=eastern_today(), station="Joe's Grill"
+    )
+    sql = str(
+        statement.compile(
+            dialect=sqlite.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+
+    assert "lower(stations.name) = 'joe''s grill'" in sql.lower()
+    assert "lower(stations.name) like" not in sql.lower()

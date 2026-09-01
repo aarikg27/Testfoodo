@@ -130,13 +130,21 @@
               <button class="meal-tab active" data-meal="Lunch">Lunch</button>
               <button class="meal-tab" data-meal="Dinner">Dinner</button>
             </div>
-            <label class="search-field">
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" />
-              </svg>
-              <span class="sr-only">Search foods</span>
-              <input id="food-search" type="search" placeholder="Search the menu" />
-            </label>
+            <div class="menu-filter-tools">
+              <label class="station-field">
+                <span class="sr-only">Dining station</span>
+                <select id="station-filter" aria-label="Dining station">
+                  <option value="">All stations</option>
+                </select>
+              </label>
+              <label class="search-field">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" />
+                </svg>
+                <span class="sr-only">Search foods</span>
+                <input id="food-search" type="search" placeholder="Search the menu" />
+              </label>
+            </div>
           </div>
 
           <div class="active-filter-row" id="active-filters"></div>
@@ -330,4 +338,3 @@
     <script src="app.js" defer></script>
   </body>
 </html>
-
