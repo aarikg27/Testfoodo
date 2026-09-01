@@ -34,6 +34,19 @@ def eastern_today() -> date:
     return datetime.now(EASTERN).date()
 
 
+def as_utc(value: datetime | None) -> datetime | None:
+    """Normalize database timestamps before serializing them to the browser.
+
+    SQLite drops timezone metadata even for timezone-aware columns. Treat those
+    naive values as UTC, which is how every timestamp in this app is written.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _label_groups(food: Food) -> tuple[list[str], list[str], list[str]]:
     labels = sorted({label.name for label in food.labels})
     dietary = sorted({label.name for label in food.labels if label.kind == "dietary"})
@@ -75,7 +88,7 @@ def availability_to_response(item: MenuAvailability) -> FoodResponse:
         labels=labels,
         dietary_labels=dietary,
         allergens=allergens,
-        nutrition_updated_at=food.nutrition_updated_at,
+        nutrition_updated_at=as_utc(food.nutrition_updated_at),
     )
 
 
@@ -221,7 +234,7 @@ async def list_foods(
         limit=limit,
         offset=offset,
         menu_date=menu_date,
-        last_scraped_at=last_scraped,
+        last_scraped_at=as_utc(last_scraped),
     )
 
 

@@ -88,6 +88,12 @@ function localDateString(value) {
   return new Date(value.getTime() - offset * 60000).toISOString().slice(0, 10);
 }
 
+function apiDateTime(value) {
+  if (typeof value !== "string") return new Date(value);
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  return new Date(hasTimezone ? value : `${value}Z`);
+}
+
 function dateWithOffset(days) {
   const value = new Date(`${state.date}T12:00:00`);
   value.setDate(value.getDate() + days);
@@ -391,7 +397,7 @@ function renderSavedMeals() {
 function renderHistory() {
   const days = Array.from({ length: 7 }, (_, index) => dateWithOffset(index - 6));
   const totals = days.map((day) => {
-    const logs = state.historyLogs.filter((log) => localDateString(new Date(log.eaten_at)) === day);
+    const logs = state.historyLogs.filter((log) => localDateString(apiDateTime(log.eaten_at)) === day);
     return { day, calories: totalsFor(logs).calories };
   });
   const max = Math.max(...totals.map((item) => item.calories), state.goals.calorie_goal, 1);
@@ -451,14 +457,14 @@ async function loadPersonalData() {
     state.goals = goals;
     state.preferences = preferences;
     state.historyLogs = logs;
-    state.logs = logs.filter((log) => localDateString(new Date(log.eaten_at)) === state.date);
+    state.logs = logs.filter((log) => localDateString(apiDateTime(log.eaten_at)) === state.date);
     state.favorites = favorites;
     state.savedMeals = savedMeals;
   } else {
     state.goals = { ...DEFAULT_GOALS, ...readStorage(STORAGE.goals, {}) };
     state.preferences = { ...DEFAULT_PREFERENCES, ...readStorage(STORAGE.preferences, {}) };
     state.historyLogs = readStorage(STORAGE.logs, []);
-    state.logs = state.historyLogs.filter((log) => localDateString(new Date(log.eaten_at)) === state.date);
+    state.logs = state.historyLogs.filter((log) => localDateString(apiDateTime(log.eaten_at)) === state.date);
     state.favorites = readStorage(STORAGE.favorites, []);
     state.savedMeals = readStorage(STORAGE.meals, []);
   }
@@ -491,7 +497,7 @@ function renderFreshness() {
     elements.freshness.innerHTML = `<span class="live-dot" style="background:#f1b82d"></span><span>No scrape recorded for this date</span>`;
     return;
   }
-  const formatted = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }).format(new Date(state.lastScrapedAt));
+  const formatted = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }).format(apiDateTime(state.lastScrapedAt));
   elements.freshness.innerHTML = `<span class="live-dot"></span><span>Menu updated ${escapeHTML(formatted)}</span>`;
 }
 
