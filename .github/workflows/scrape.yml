@@ -3,7 +3,7 @@ name: Refresh UMD menus
 on:
   workflow_dispatch:
   schedule:
-    # Runs every morning; all menu dates are interpreted in America/New_York.
+    # Backstop refresh; the API also checks UMD directly every 15 minutes while awake.
     - cron: "0 10 * * *"
 
 concurrency:

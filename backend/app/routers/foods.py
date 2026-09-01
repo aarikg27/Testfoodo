@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable
 from zoneinfo import ZoneInfo
 
@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from ..database import get_db
+from ..menu_refresh import refresh_status, schedule_menu_refresh
 from ..models import (
     DiningHall,
     Food,
@@ -22,6 +23,8 @@ from ..models import (
 from ..schemas import (
     FoodResponse,
     HallResponse,
+    MenuContextResponse,
+    MenuDateResponse,
     PaginatedFoods,
     ScrapeStatusResponse,
 )
@@ -32,6 +35,36 @@ EASTERN = ZoneInfo("America/New_York")
 
 def eastern_today() -> date:
     return datetime.now(EASTERN).date()
+
+
+def current_meal_period() -> str:
+    hour = datetime.now(EASTERN).hour
+    if hour < 11:
+        return "Breakfast"
+    if hour < 16:
+        return "Lunch"
+    return "Dinner"
+
+
+def require_current_or_future(menu_date: date) -> None:
+    if menu_date < eastern_today():
+        raise HTTPException(
+            status_code=422,
+            detail="Past menus are not available; choose today or a published future date",
+        )
+
+
+def effective_meal(menu_date: date, meal: str | None = None) -> str | None:
+    require_current_or_future(menu_date)
+    if menu_date != eastern_today():
+        return meal
+    current = current_meal_period()
+    if meal and meal.lower() != current.lower():
+        raise HTTPException(
+            status_code=422,
+            detail=f"Only the current meal period ({current}) is available for today",
+        )
+    return current
 
 
 def as_utc(value: datetime | None) -> datetime | None:
@@ -159,13 +192,18 @@ async def list_halls(
     menu_date: date = Query(default_factory=eastern_today, alias="date"),
     db: AsyncSession = Depends(get_db),
 ):
-    count_subquery = (
+    require_current_or_future(menu_date)
+    meal_filter = effective_meal(menu_date)
+    count_statement = (
         select(Station.hall_id, func.count(MenuAvailability.id).label("item_count"))
         .join(MenuAvailability, MenuAvailability.station_id == Station.id)
         .where(MenuAvailability.menu_date == menu_date)
-        .group_by(Station.hall_id)
-        .subquery()
     )
+    if meal_filter:
+        count_statement = count_statement.where(
+            MenuAvailability.meal_period == meal_filter
+        )
+    count_subquery = count_statement.group_by(Station.hall_id).subquery()
     rows = (
         await db.execute(
             select(DiningHall, func.coalesce(count_subquery.c.item_count, 0))
@@ -199,6 +237,7 @@ async def list_foods(
     offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
+    meal = effective_meal(menu_date, meal)
     statement = menu_statement(
         menu_date=menu_date,
         hall=hall,
@@ -244,13 +283,62 @@ async def get_food(
     menu_date: date = Query(default_factory=eastern_today, alias="date"),
     db: AsyncSession = Depends(get_db),
 ):
-    statement = menu_statement(menu_date=menu_date).where(
-        Food.id == food_id
-    )
+    statement = menu_statement(
+        menu_date=menu_date, meal=effective_meal(menu_date)
+    ).where(Food.id == food_id)
     item = await db.scalar(statement.limit(1))
     if not item:
         raise HTTPException(status_code=404, detail="Food is not available on this date")
     return availability_to_response(item)
+
+
+@router.get("/menu-context", response_model=MenuContextResponse)
+async def menu_context(db: AsyncSession = Depends(get_db)):
+    today = eastern_today()
+    await schedule_menu_refresh()
+    rows = (
+        await db.execute(
+            select(
+                MenuAvailability.menu_date,
+                MenuAvailability.meal_period,
+                func.count(MenuAvailability.id),
+            )
+            .where(
+                MenuAvailability.menu_date >= today,
+                MenuAvailability.menu_date <= today + timedelta(days=13),
+            )
+            .group_by(MenuAvailability.menu_date, MenuAvailability.meal_period)
+            .order_by(MenuAvailability.menu_date, MenuAvailability.meal_period)
+        )
+    ).all()
+    grouped: dict[date, dict[str, int]] = {}
+    for menu_date, meal_period, count in rows:
+        grouped.setdefault(menu_date, {})[meal_period] = int(count)
+    grouped.setdefault(today, {})
+    current = current_meal_period()
+    grouped[today] = (
+        {current: grouped[today][current]} if current in grouped[today] else {}
+    )
+    dates = [
+        MenuDateResponse(
+            date=menu_date,
+            meal_periods=[
+                meal
+                for meal in ("Breakfast", "Lunch", "Dinner")
+                if meal in meal_counts
+            ],
+            item_count=sum(meal_counts.values()),
+        )
+        for menu_date, meal_counts in sorted(grouped.items())
+    ]
+    status_value, last_refresh_at = await refresh_status()
+    return MenuContextResponse(
+        today=today,
+        current_meal=current_meal_period(),
+        dates=dates,
+        refresh_status=status_value,
+        last_refresh_at=last_refresh_at,
+    )
 
 
 @router.get("/scrape-status", response_model=ScrapeStatusResponse)

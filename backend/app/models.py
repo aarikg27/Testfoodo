@@ -214,6 +214,7 @@ class UserPreference(Base):
     fat_goal_g: Mapped[float] = mapped_column(Float, default=70, nullable=False)
     dietary_preferences: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     excluded_labels: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    profile_data: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     favorite_hall_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("dining_halls.id", ondelete="SET NULL")
     )

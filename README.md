@@ -7,7 +7,7 @@ Testfoodo is a mobile-first UMD dining hall nutrition tracker. It imports curren
 - **Frontend:** vanilla HTML, CSS, and JavaScript on Cloudflare Pages
 - **API and accounts:** FastAPI on Render
 - **Database:** Neon PostgreSQL
-- **Menu importer:** Python Playwright request client, scheduled with GitHub Actions
+- **Menu importer:** Python Playwright request client, refreshed directly from UMD by the API every 15 minutes while it is awake, with GitHub Actions as a daily backstop
 
 The frontend also has a guest mode backed by browser storage. Creating a new account migrates guest goals, logs, favorites, and dietary settings when possible.
 
@@ -54,6 +54,8 @@ python3 -m http.server 5173
 ```
 
 Open [http://localhost:5173](http://localhost:5173). API documentation is available at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+The API starts a background UMD refresh automatically. The browser initially shows cached menu data, labels the refresh as in progress, and swaps in the live published menu when the refresh completes. Only today and future dates actually returned by UMD appear in the date selector; today is restricted to the current meal period.
 
 SQLite is used automatically for local development. `python -m app.seed_demo` inserts a small same-day menu for UI development only; do not run it against production.
 

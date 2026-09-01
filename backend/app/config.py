@@ -20,6 +20,9 @@ class Settings(BaseSettings):
         "Testfoodo/1.0 (UMD student nutrition tracker; educational use)"
     )
     scraper_concurrency: int = 6
+    auto_refresh_menus: bool = True
+    menu_refresh_minutes: int = 15
+    menu_future_days: int = 7
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

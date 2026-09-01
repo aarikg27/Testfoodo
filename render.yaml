@@ -23,4 +23,10 @@ services:
         value: 6
       - key: SCRAPER_USER_AGENT
         value: Testfoodo/1.0 (UMD student nutrition tracker)
+      - key: AUTO_REFRESH_MENUS
+        value: true
+      - key: MENU_REFRESH_MINUTES
+        value: 15
+      - key: MENU_FUTURE_DAYS
+        value: 7
 

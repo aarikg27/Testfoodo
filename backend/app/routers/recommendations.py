@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..recommendations import Target, build_recommendations, make_candidate
 from ..schemas import RecommendationRequest, RecommendationResponse
-from .foods import menu_statement
+from .foods import effective_meal, menu_statement
 
 router = APIRouter(tags=["recommendations"])
 
@@ -15,10 +15,11 @@ router = APIRouter(tags=["recommendations"])
 async def recommend_foods(
     payload: RecommendationRequest, db: AsyncSession = Depends(get_db)
 ):
+    meal = effective_meal(payload.menu_date, payload.meal)
     statement = menu_statement(
         menu_date=payload.menu_date,
         hall=payload.hall,
-        meal=payload.meal,
+        meal=meal,
         dietary=payload.dietary_preferences,
         excluded_labels=payload.excluded_labels,
     )

@@ -48,3 +48,11 @@ def test_recommendations_return_explainable_strategies():
     assert all(1 <= len(plan["items"]) <= 3 for plan in plans)
     assert all(plan["totals"]["calories"] > 0 for plan in plans)
 
+
+def test_recommendations_stop_when_daily_targets_are_met():
+    plans = build_recommendations(
+        FOODS, Target(calories=100, protein_g=0, carbs_g=0, fat_g=0)
+    )
+
+    assert plans == []
+

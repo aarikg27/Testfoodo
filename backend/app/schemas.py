@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
@@ -96,6 +96,16 @@ class GoalUpdate(GoalValues):
     save_as_default: bool = False
 
 
+class BodyProfile(BaseModel):
+    age: Optional[int] = Field(default=None, ge=13, le=100)
+    height_cm: Optional[float] = Field(default=None, ge=100, le=250)
+    weight_kg: Optional[float] = Field(default=None, ge=30, le=350)
+    gender: Optional[Literal["woman", "man", "nonbinary", "prefer_not_to_say"]] = None
+    activity_level: Literal["sedentary", "light", "moderate", "very_active"] = "moderate"
+    goal_type: Literal["lose", "maintain", "gain"] = "maintain"
+    use_profile_targets: bool = True
+
+
 class PreferenceResponse(BaseModel):
     calorie_goal: float
     protein_goal_g: float
@@ -104,12 +114,14 @@ class PreferenceResponse(BaseModel):
     dietary_preferences: List[str]
     excluded_labels: List[str]
     favorite_hall_id: Optional[int]
+    profile: BodyProfile = Field(default_factory=BodyProfile)
 
 
 class PreferenceUpdate(BaseModel):
     dietary_preferences: List[str] = []
     excluded_labels: List[str] = []
     favorite_hall_id: Optional[int] = None
+    profile: BodyProfile = Field(default_factory=BodyProfile)
 
 
 class FoodLogCreate(BaseModel):
@@ -248,4 +260,18 @@ class ScrapeStatusResponse(BaseModel):
     menu_items_found: int = 0
     foods_refreshed: int = 0
     errors: List[str] = []
+
+
+class MenuDateResponse(BaseModel):
+    date: date
+    meal_periods: List[str]
+    item_count: int
+
+
+class MenuContextResponse(BaseModel):
+    today: date
+    current_meal: str
+    dates: List[MenuDateResponse]
+    refresh_status: str
+    last_refresh_at: Optional[datetime] = None
 

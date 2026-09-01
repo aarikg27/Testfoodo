@@ -19,6 +19,15 @@ const DEFAULT_PREFERENCES = {
   dietary_preferences: [],
   excluded_labels: [],
   favorite_hall_id: null,
+  profile: {
+    age: null,
+    height_cm: null,
+    weight_kg: null,
+    gender: null,
+    activity_level: "moderate",
+    goal_type: "maintain",
+    use_profile_targets: true,
+  },
 };
 const EXCLUSION_LABELS = [
   "alcohol",
@@ -46,6 +55,8 @@ const state = {
   menu: [],
   menuTotal: 0,
   lastScrapedAt: null,
+  menuContext: null,
+  refreshPoll: null,
   visibleCount: 12,
   goals: { ...DEFAULT_GOALS },
   preferences: { ...DEFAULT_PREFERENCES },
@@ -63,6 +74,7 @@ const elements = {
   todayLabel: document.querySelector("#today-label"),
   freshness: document.querySelector("#freshness-status"),
   macroGrid: document.querySelector("#macro-grid"),
+  nutritionGuidance: document.querySelector("#nutrition-guidance"),
   foodGrid: document.querySelector("#food-grid"),
   resultCount: document.querySelector("#result-count"),
   search: document.querySelector("#food-search"),
@@ -81,6 +93,8 @@ const elements = {
   profileSubtitle: document.querySelector("#profile-subtitle"),
   profileAvatar: document.querySelector("#profile-avatar"),
   toastRegion: document.querySelector("#toast-region"),
+  menuDateTitle: document.querySelector("#menu-date-title"),
+  targetPreview: document.querySelector("#target-preview"),
 };
 
 function localDateString(value) {
@@ -95,14 +109,38 @@ function apiDateTime(value) {
 }
 
 function dateWithOffset(days) {
-  const value = new Date(`${state.date}T12:00:00`);
+  const value = new Date(`${state.menuContext?.today || state.date}T12:00:00`);
   value.setDate(value.getDate() + days);
   return localDateString(value);
 }
 
 function currentMeal() {
-  const hour = new Date().getHours();
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "America/New_York",
+    }).format(new Date()),
+  );
   return hour < 11 ? "Breakfast" : hour < 16 ? "Lunch" : "Dinner";
+}
+
+function isTodaySelected() {
+  return state.date === (state.menuContext?.today || localDateString(new Date()));
+}
+
+function selectedDateContext() {
+  return state.menuContext?.dates?.find((item) => item.date === state.date) || null;
+}
+
+function allowedMeals() {
+  if (isTodaySelected()) return [state.menuContext?.current_meal || currentMeal()];
+  return selectedDateContext()?.meal_periods || [];
+}
+
+function syncSelectedMeal() {
+  const meals = allowedMeals();
+  if (meals.length && !meals.includes(state.meal)) state.meal = meals[0];
 }
 
 function selectedDateTime() {
@@ -149,6 +187,84 @@ function formatDate(value) {
     month: "long",
     day: "numeric",
   }).format(new Date(`${value}T12:00:00`));
+}
+
+function portionGuidance(name, servingSize, servings = 1) {
+  const size = String(servingSize || "").trim();
+  const count = Number(servings || 1);
+  const lowerName = String(name || "").toLowerCase();
+  const ounceMatch = size.match(/([0-9]+(?:\.[0-9]+)?)\s*oz/i);
+  if (ounceMatch) {
+    const ounces = Number(ounceMatch[1]) * count;
+    if (/soup|chili|stew|beverage|milk|juice/.test(lowerName)) {
+      const cups = ounces / 8;
+      return `${formatNumber(ounces, 1)} oz — about ${formatNumber(cups, 1)} cup${Math.abs(cups - 1) < 0.05 ? "" : "s"}`;
+    }
+    if (/chip|cracker|pretzel|popcorn/.test(lowerName)) {
+      const handfuls = ounces / 2;
+      return `${formatNumber(ounces, 1)} oz — about ${formatNumber(handfuls, 1)} loose handful${Math.abs(handfuls - 1) < 0.05 ? "" : "s"}`;
+    }
+    if (/chicken|turkey|beef|pork|salmon|fish|steak|tofu|tempeh/.test(lowerName)) {
+      const palms = ounces / 4;
+      return `${formatNumber(ounces, 1)} oz — about ${formatNumber(palms, 1)} palm-size portion${Math.abs(palms - 1) < 0.05 ? "" : "s"}`;
+    }
+    if (ounces <= 2) {
+      const tablespoons = ounces * 2;
+      return `${formatNumber(ounces, 1)} oz — about ${formatNumber(tablespoons, 1)} tablespoon${Math.abs(tablespoons - 1) < 0.05 ? "" : "s"}`;
+    }
+    const scoops = ounces / 4;
+    return `${formatNumber(ounces, 1)} oz — about ${formatNumber(scoops, 1)} level serving-spoon scoop${Math.abs(scoops - 1) < 0.05 ? "" : "s"}`;
+  }
+  const cupMatch = size.match(/([0-9]+(?:\.[0-9]+)?|1\/2|1\/4|3\/4)\s*cups?/i);
+  if (cupMatch) {
+    const fractions = { "1/2": 0.5, "1/4": 0.25, "3/4": 0.75 };
+    const cups = (fractions[cupMatch[1]] || Number(cupMatch[1])) * count;
+    return `${formatNumber(cups, 2)} cup${Math.abs(cups - 1) < 0.05 ? "" : "s"} — roughly ${formatNumber(cups * 2, 1)} level scoop${Math.abs(cups * 2 - 1) < 0.05 ? "" : "s"}`;
+  }
+  const pieceMatch = size.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:ea|each|pieces?|slices?|patt(?:y|ies)|links?|fillets?)/i);
+  if (pieceMatch) {
+    const pieces = Number(pieceMatch[1]) * count;
+    return `${formatNumber(pieces, 1)} piece${Math.abs(pieces - 1) < 0.05 ? "" : "s"}`;
+  }
+  return `${formatNumber(count, 1)} × ${size || "UMD serving"}`;
+}
+
+function profileFromForm() {
+  const feet = Number(document.querySelector("#profile-height-ft").value || 0);
+  const inches = Number(document.querySelector("#profile-height-in").value || 0);
+  const pounds = Number(document.querySelector("#profile-weight").value || 0);
+  return {
+    age: Number(document.querySelector("#profile-age").value) || null,
+    height_cm: feet || inches ? Number(((feet * 12 + inches) * 2.54).toFixed(1)) : null,
+    weight_kg: pounds ? Number((pounds / 2.20462).toFixed(1)) : null,
+    gender: document.querySelector("#profile-gender").value || null,
+    activity_level: document.querySelector("#profile-activity").value,
+    goal_type: document.querySelector("#profile-goal").value,
+    use_profile_targets: document.querySelector("#profile-use-targets").checked,
+  };
+}
+
+function suggestedGoals(profile) {
+  if (!profile.age || !profile.height_cm || !profile.weight_kg) return null;
+  const genderAdjustment = profile.gender === "man" ? 5 : profile.gender === "woman" ? -161 : -78;
+  const activityFactors = { sedentary: 1.2, light: 1.375, moderate: 1.55, very_active: 1.725 };
+  const goalAdjustments = { lose: -300, maintain: 0, gain: 300 };
+  const bmr = 10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * profile.age + genderAdjustment;
+  const calories = Math.round(Math.min(5000, Math.max(1200, bmr * (activityFactors[profile.activity_level] || 1.55) + (goalAdjustments[profile.goal_type] || 0))) / 25) * 25;
+  const proteinMultiplier = profile.goal_type === "lose" ? 1.8 : profile.goal_type === "gain" ? 1.7 : 1.6;
+  const protein = Math.round(profile.weight_kg * proteinMultiplier);
+  const fat = Math.round((calories * 0.27) / 9);
+  const carbs = Math.max(50, Math.round((calories - protein * 4 - fat * 9) / 4));
+  return { calorie_goal: calories, protein_goal_g: protein, carbs_goal_g: carbs, fat_goal_g: fat };
+}
+
+function renderTargetPreview() {
+  const goals = suggestedGoals(profileFromForm());
+  elements.targetPreview.classList.toggle("ready", Boolean(goals));
+  elements.targetPreview.textContent = goals
+    ? `Estimated daily targets: ${formatNumber(goals.calorie_goal)} kcal · ${formatNumber(goals.protein_goal_g)}g protein · ${formatNumber(goals.carbs_goal_g)}g carbs · ${formatNumber(goals.fat_goal_g)}g fat. This is a planning estimate, not medical advice.`
+    : "Complete age, height, and weight to preview your estimated targets.";
+  return goals;
 }
 
 async function api(path, options = {}) {
@@ -234,19 +350,40 @@ function renderMacroCards() {
       const goal = state.goals[macro.goal];
       const progress = Math.min((consumed / Math.max(goal, 1)) * 100, 100);
       const remaining = Math.max(goal - consumed, 0);
+      const over = Math.max(consumed - goal, 0);
       return `
-        <article class="macro-card" style="--macro-color:${macro.color}">
+        <article class="macro-card ${over > 0 ? "over-target" : ""}" style="--macro-color:${macro.color}">
           <div class="macro-ring" style="--progress:${progress.toFixed(1)}">
             <strong>${Math.round(progress)}%</strong>
           </div>
           <div class="macro-copy">
             <span>${macro.label}</span>
             <h3>${formatNumber(consumed, 1)}<small>${macro.unit}</small></h3>
-            <small>${formatNumber(remaining, 1)} ${macro.unit} remaining</small>
+            <small>${over > 0 ? `${formatNumber(over, 1)} ${macro.unit} over target` : `${formatNumber(remaining, 1)} ${macro.unit} remaining`}</small>
           </div>
         </article>`;
     })
     .join("");
+}
+
+function renderNutritionGuidance() {
+  const totals = totalsFor();
+  const guidance = [];
+  const checks = [
+    ["calories", "calorie_goal", "Calories", "If your goal is weight change, repeated calorie overages can slow or reverse the result you expect."],
+    ["protein_g", "protein_goal_g", "Protein", "More protein after your target is met is not automatically more useful; leave room for carbohydrates, fats, and varied foods."],
+    ["carbs_g", "carbs_goal_g", "Carbohydrates", "Favor fiber-rich choices and balance the rest of today’s plate instead of chasing a perfect number."],
+    ["fat_g", "fat_goal_g", "Fat", "High-fat portions add calories quickly, so choose a lighter next item if that fits your goal."],
+  ];
+  checks.forEach(([key, goalKey, label, message]) => {
+    const goal = Number(state.goals[goalKey] || 0);
+    const consumed = Number(totals[key] || 0);
+    if (goal > 0 && consumed > goal) {
+      const percentage = Math.round(((consumed - goal) / goal) * 100);
+      guidance.push(`<div class="guidance-card"><strong>${escapeHTML(label)} is ${percentage}% over your target.</strong>${escapeHTML(message)}</div>`);
+    }
+  });
+  elements.nutritionGuidance.innerHTML = guidance.join("");
 }
 
 function renderLog() {
@@ -259,6 +396,7 @@ function renderLog() {
         <div>
           <strong title="${escapeHTML(log.food_name)}">${escapeHTML(log.food_name)}</strong>
           <small>${formatNumber(log.calories_per_serving * log.servings)} kcal · ${formatNumber(log.protein_per_serving_g * log.servings, 1)}g protein</small>
+          <span class="portion-guide">${escapeHTML(portionGuidance(log.food_name, log.serving_size, log.servings))}</span>
         </div>
         <div class="log-item-actions">
           <div class="serving-control" aria-label="Servings">
@@ -296,6 +434,7 @@ function renderMenu() {
   const visible = foods.slice(0, state.visibleCount);
   const favorites = favoriteIds();
   elements.resultCount.textContent = `${foods.length} item${foods.length === 1 ? "" : "s"}`;
+  elements.menuDateTitle.textContent = isTodaySelected() ? `Current ${state.meal.toLowerCase()} menu` : `${formatDate(state.date)} menu`;
   elements.loadMore.classList.toggle("hidden", visible.length >= foods.length);
   elements.foodGrid.innerHTML = visible.length
     ? visible
@@ -311,6 +450,7 @@ function renderMenu() {
                 <span class="food-station">${escapeHTML(food.station)}</span>
                 <h3>${escapeHTML(food.name)}</h3>
                 <span class="serving-copy">${escapeHTML(food.serving_size || "1 serving")}</span>
+                <span class="portion-guide">${escapeHTML(portionGuidance(food.name, food.serving_size))}</span>
               </div>
               <button class="favorite-button ${favorites.has(String(food.id)) ? "active" : ""}" data-action="favorite" aria-label="Favorite ${escapeHTML(food.name)}">${favorites.has(String(food.id)) ? "♥" : "♡"}</button>
             </div>
@@ -321,7 +461,7 @@ function renderMenu() {
                 <span><strong>${formatNumber(food.protein_g, 1)}g</strong>protein</span>
                 <span><strong>${formatNumber(food.carbs_g, 1)}g</strong>carbs</span>
               </div>
-              <button class="add-food-button" data-action="add-food" aria-label="Log ${escapeHTML(food.name)}">+</button>
+              <button class="add-food-button" data-action="add-food" aria-label="Log ${escapeHTML(food.name)}" ${isTodaySelected() ? "" : "disabled title=\"Future menus are for planning only\""}>${isTodaySelected() ? "+" : "⌕"}</button>
             </div>
           </article>`;
         })
@@ -339,7 +479,9 @@ function renderActiveFilters() {
 
 function renderRecommendations() {
   if (!state.recommendations.length) {
-    elements.recommendationGrid.innerHTML = `<div class="empty-collection" style="color:#aaa8a4;grid-column:1/-1">No recommendation yet. Add menu data or try another hall and meal.</div>`;
+    const totals = totalsFor();
+    const targetsMet = totals.calories >= state.goals.calorie_goal || remainingMacros().calories < 150;
+    elements.recommendationGrid.innerHTML = `<div class="empty-collection" style="color:#aaa8a4;grid-column:1/-1">${targetsMet ? "You’re at or near today’s target, so we’re not suggesting another full meal." : "No recommendation is available for this dining hall and meal period yet."}</div>`;
     return;
   }
   elements.recommendationGrid.innerHTML = state.recommendations
@@ -353,11 +495,11 @@ function renderRecommendations() {
         <h3>${escapeHTML(plan.title)}</h3>
         <p>${escapeHTML(plan.explanation)}</p>
         <div class="recommendation-foods">
-          ${plan.items.map((item) => `<div class="recommendation-food"><span>${escapeHTML(item.name)}</span><span>${formatNumber(item.servings, 1)}× · ${formatNumber(item.calories)} kcal</span></div>`).join("")}
+          ${plan.items.map((item) => `<div class="recommendation-food"><span>${escapeHTML(item.name)}<small class="portion-guide">${escapeHTML(portionGuidance(item.name, item.serving_size, item.servings))}</small></span><span>${formatNumber(item.servings, 1)}× · ${formatNumber(item.calories)} kcal</span></div>`).join("")}
         </div>
         <div class="recommendation-footer">
           <div class="recommendation-macros"><strong>${formatNumber(plan.totals.calories)} kcal</strong> · ${formatNumber(plan.totals.protein_g, 1)}g P · ${formatNumber(plan.totals.carbs_g, 1)}g C · ${formatNumber(plan.totals.fat_g, 1)}g F</div>
-          <button class="add-plan-button" data-action="add-plan">Add meal</button>
+          <button class="add-plan-button" data-action="add-plan" ${isTodaySelected() ? "" : "disabled"}>${isTodaySelected() ? "Add meal" : "Preview only"}</button>
         </div>
       </article>`,
     )
@@ -416,6 +558,7 @@ function renderHistory() {
 function renderAll() {
   renderProfile();
   renderMacroCards();
+  renderNutritionGuidance();
   renderLog();
   renderMenu();
   renderActiveFilters();
@@ -432,6 +575,57 @@ async function restoreSession() {
   } catch {
     clearSession();
   }
+}
+
+function renderMenuControls() {
+  const dates = state.menuContext?.dates || [{ date: state.date, meal_periods: [state.meal], item_count: 0 }];
+  elements.date.innerHTML = dates
+    .map((item) => {
+      const label = item.date === state.menuContext?.today ? "Today" : formatDate(item.date);
+      return `<option value="${item.date}">${escapeHTML(label)}${item.item_count ? ` · ${formatNumber(item.item_count)} items` : ""}</option>`;
+    })
+    .join("");
+  elements.date.value = state.date;
+  const meals = allowedMeals();
+  document.querySelectorAll(".meal-tab").forEach((button) => {
+    const available = meals.includes(button.dataset.meal);
+    button.disabled = !available;
+    button.hidden = !available;
+    button.classList.toggle("active", button.dataset.meal === state.meal);
+  });
+  document.querySelector("#custom-food-button").disabled = !isTodaySelected();
+  document.querySelector("#save-meal-button").disabled = !isTodaySelected();
+  elements.todayLabel.textContent = formatDate(state.date).toUpperCase();
+}
+
+async function loadMenuContext({ preserveDate = true } = {}) {
+  const context = await api("/menu-context");
+  state.menuContext = context;
+  const publishedDates = new Set(context.dates.map((item) => item.date));
+  if (!preserveDate || !publishedDates.has(state.date)) state.date = context.today;
+  syncSelectedMeal();
+  renderMenuControls();
+  return context;
+}
+
+function watchLiveRefresh() {
+  if (state.refreshPoll) clearTimeout(state.refreshPoll);
+  if (state.menuContext?.refresh_status !== "refreshing") return;
+  state.refreshPoll = setTimeout(async () => {
+    try {
+      const wasRefreshing = state.menuContext?.refresh_status === "refreshing";
+      await loadMenuContext();
+      if (wasRefreshing && state.menuContext.refresh_status !== "refreshing") {
+        await loadHalls();
+        await Promise.all([loadMenu(), loadRecommendations()]);
+        toast("Live UMD menus are up to date");
+      }
+      renderFreshness();
+      watchLiveRefresh();
+    } catch {
+      state.refreshPoll = setTimeout(watchLiveRefresh, 10000);
+    }
+  }, 5000);
 }
 
 async function loadHalls() {
@@ -493,12 +687,16 @@ async function loadMenu() {
 }
 
 function renderFreshness() {
+  if (state.menuContext?.refresh_status === "refreshing") {
+    elements.freshness.innerHTML = `<span class="live-dot pulse"></span><span>Checking UMD for live updates…</span>`;
+    return;
+  }
   if (!state.lastScrapedAt) {
     elements.freshness.innerHTML = `<span class="live-dot" style="background:#f1b82d"></span><span>No scrape recorded for this date</span>`;
     return;
   }
   const formatted = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }).format(apiDateTime(state.lastScrapedAt));
-  elements.freshness.innerHTML = `<span class="live-dot"></span><span>Menu updated ${escapeHTML(formatted)}</span>`;
+  elements.freshness.innerHTML = `<span class="live-dot"></span><span>Live UMD menu · checked ${escapeHTML(formatted)}</span>`;
 }
 
 async function loadRecommendations() {
@@ -544,6 +742,7 @@ function guestLogFromFood(food, servings = 1) {
 }
 
 async function logFood(food, servings = 1, quiet = false) {
+  if (!isTodaySelected()) throw new Error("Future menus are for planning; foods can only be logged today");
   let log;
   if (state.user) {
     log = await api("/users/me/logs", {
@@ -559,6 +758,7 @@ async function logFood(food, servings = 1, quiet = false) {
   state.logs.unshift(log);
   state.historyLogs.unshift(log);
   renderMacroCards();
+  renderNutritionGuidance();
   renderLog();
   renderHistory();
   if (!quiet) toast(`${food.name} added to today`);
@@ -590,6 +790,7 @@ async function addCustomFood(payload) {
   state.logs.unshift(log);
   state.historyLogs.unshift(log);
   renderMacroCards();
+  renderNutritionGuidance();
   renderLog();
   renderHistory();
 }
@@ -604,6 +805,7 @@ async function updateLog(log, servings) {
     writeStorage(STORAGE.logs, state.historyLogs);
   }
   renderMacroCards();
+  renderNutritionGuidance();
   renderLog();
   renderHistory();
 }
@@ -614,6 +816,7 @@ async function deleteLog(log) {
   state.historyLogs = state.historyLogs.filter((item) => item.id !== log.id);
   if (!state.user) writeStorage(STORAGE.logs, state.historyLogs);
   renderMacroCards();
+  renderNutritionGuidance();
   renderLog();
   renderHistory();
   toast("Food removed from today");
@@ -668,7 +871,13 @@ async function addRecommendationPlan(plan) {
 async function saveCurrentMeal() {
   const usable = state.logs.filter((log) => log.food_id);
   if (!usable.length) return toast("Add at least one dining hall food first");
-  const name = window.prompt("Name this saved meal:", `${state.meal} favorites`);
+  document.querySelector("#save-meal-name").value = `${state.meal} favorites`;
+  document.querySelector("#save-meal-modal").showModal();
+}
+
+async function submitSavedMeal(name) {
+  const usable = state.logs.filter((log) => log.food_id);
+  if (!usable.length) throw new Error("Add at least one dining hall food first");
   if (!name?.trim()) return;
   const grouped = new Map();
   usable.forEach((log) => grouped.set(log.food_id, (grouped.get(log.food_id) || 0) + Number(log.servings)));
@@ -737,6 +946,17 @@ function openSettingsModal() {
   document.querySelectorAll('[name="exclude"]').forEach((input) => {
     input.checked = state.preferences.excluded_labels.includes(input.value);
   });
+  const profile = { ...DEFAULT_PREFERENCES.profile, ...(state.preferences.profile || {}) };
+  const totalInches = profile.height_cm ? profile.height_cm / 2.54 : 0;
+  document.querySelector("#profile-age").value = profile.age || "";
+  document.querySelector("#profile-gender").value = profile.gender || "";
+  document.querySelector("#profile-height-ft").value = totalInches ? Math.floor(totalInches / 12) : "";
+  document.querySelector("#profile-height-in").value = totalInches ? Math.round(totalInches % 12) : "";
+  document.querySelector("#profile-weight").value = profile.weight_kg ? (profile.weight_kg * 2.20462).toFixed(1) : "";
+  document.querySelector("#profile-activity").value = profile.activity_level;
+  document.querySelector("#profile-goal").value = profile.goal_type;
+  document.querySelector("#profile-use-targets").checked = profile.use_profile_targets;
+  renderTargetPreview();
   document.querySelector("#settings-modal").showModal();
 }
 
@@ -778,7 +998,6 @@ async function migrateGuestData() {
 }
 
 async function initialize() {
-  elements.date.value = state.date;
   elements.todayLabel.textContent = formatDate(state.date).toUpperCase();
   document.querySelectorAll(".meal-tab").forEach((button) => button.classList.toggle("active", button.dataset.meal === state.meal));
   document.querySelector("#exclusion-choices").innerHTML = EXCLUSION_LABELS.map(
@@ -787,10 +1006,12 @@ async function initialize() {
   renderAll();
   await restoreSession();
   try {
+    await loadMenuContext({ preserveDate: false });
     await loadPersonalData();
     await loadHalls();
     renderAll();
     await Promise.all([loadMenu(), loadRecommendations()]);
+    watchLiveRefresh();
   } catch (error) {
     toast(error.message);
   }
@@ -799,7 +1020,7 @@ async function initialize() {
 
 document.querySelector("#meal-tabs").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-meal]");
-  if (!button) return;
+  if (!button || button.disabled) return;
   state.meal = button.dataset.meal;
   document.querySelectorAll(".meal-tab").forEach((item) => item.classList.toggle("active", item === button));
   await Promise.all([loadMenu(), loadRecommendations()]);
@@ -807,7 +1028,8 @@ document.querySelector("#meal-tabs").addEventListener("click", async (event) => 
 
 elements.date.addEventListener("change", async () => {
   state.date = elements.date.value;
-  elements.todayLabel.textContent = formatDate(state.date).toUpperCase();
+  syncSelectedMeal();
+  renderMenuControls();
   await loadPersonalData();
   await loadHalls();
   renderAll();
@@ -886,11 +1108,27 @@ elements.savedMealsList.addEventListener("click", async (event) => {
   }
 });
 
-document.querySelector("#refresh-recommendations").addEventListener("click", loadRecommendations);
 document.querySelector("#edit-goals-button").addEventListener("click", openGoalsModal);
 document.querySelector("#settings-button").addEventListener("click", openSettingsModal);
 document.querySelector("#custom-food-button").addEventListener("click", () => document.querySelector("#custom-food-modal").showModal());
 document.querySelector("#save-meal-button").addEventListener("click", () => saveCurrentMeal().catch((error) => toast(error.message)));
+
+document.querySelector("#save-meal-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await submitSavedMeal(document.querySelector("#save-meal-name").value);
+    document.querySelector("#save-meal-modal").close();
+  } catch (error) {
+    toast(error.message);
+  }
+});
+
+document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+  button.addEventListener("click", () => button.closest("dialog")?.close());
+});
+
+document.querySelector(".profile-group").addEventListener("input", renderTargetPreview);
+document.querySelector(".profile-group").addEventListener("change", renderTargetPreview);
 
 document.querySelector("#profile-button").addEventListener("click", async () => {
   if (!state.user) {
@@ -954,6 +1192,7 @@ document.querySelector("#goals-form").addEventListener("submit", async (event) =
     }
     document.querySelector("#goals-modal").close();
     renderMacroCards();
+    renderNutritionGuidance();
     renderHistory();
     await loadRecommendations();
     toast("Macro goals updated");
@@ -964,10 +1203,13 @@ document.querySelector("#goals-form").addEventListener("submit", async (event) =
 
 document.querySelector("#settings-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  const profile = profileFromForm();
+  const estimatedGoals = suggestedGoals(profile);
   const preferences = {
     dietary_preferences: [...document.querySelectorAll('[name="dietary"]:checked')].map((input) => input.value),
     excluded_labels: [...document.querySelectorAll('[name="exclude"]:checked')].map((input) => input.value),
     favorite_hall_id: state.preferences.favorite_hall_id || null,
+    profile,
   };
   try {
     if (state.user) state.preferences = await api("/users/me/preferences", { method: "PUT", body: JSON.stringify(preferences) });
@@ -975,10 +1217,21 @@ document.querySelector("#settings-form").addEventListener("submit", async (event
       state.preferences = preferences;
       writeStorage(STORAGE.preferences, preferences);
     }
+    if (profile.use_profile_targets && estimatedGoals) {
+      if (state.user) {
+        state.goals = await api("/users/me/goals", {
+          method: "PUT",
+          body: JSON.stringify({ ...estimatedGoals, goal_date: state.date, save_as_default: true }),
+        });
+      } else {
+        state.goals = estimatedGoals;
+        writeStorage(STORAGE.goals, estimatedGoals);
+      }
+    }
     document.querySelector("#settings-modal").close();
-    renderActiveFilters();
+    renderAll();
     await Promise.all([loadMenu(), loadRecommendations()]);
-    toast("Dietary filters applied");
+    toast(profile.use_profile_targets && estimatedGoals ? "Profile saved and personalized targets applied" : "Profile and dietary filters saved");
   } catch (error) {
     toast(error.message);
   }
@@ -1006,14 +1259,26 @@ document.querySelector("#custom-food-form").addEventListener("submit", async (ev
   }
 });
 
-const observer = new IntersectionObserver(
-  (entries) => {
-    const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-    if (!visible) return;
-    document.querySelectorAll(".nav-link").forEach((link) => link.classList.toggle("active", link.getAttribute("href") === `#${visible.target.id}`));
-  },
-  { threshold: 0.2 },
-);
-["dashboard", "menu", "insights"].forEach((id) => observer.observe(document.getElementById(id)));
+const navigationSections = ["dashboard", "menu", "insights"].map((id) => document.getElementById(id));
+function updateActiveNavigation() {
+  const marker = window.scrollY + Math.max(
+    document.querySelector(".topbar").offsetHeight + 80,
+    window.innerHeight * 0.5,
+  );
+  let active = navigationSections[0];
+  const nearBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 24;
+  if (nearBottom) active = navigationSections.at(-1);
+  else {
+    navigationSections.forEach((section) => {
+      if (section.offsetTop <= marker) active = section;
+    });
+  }
+  document.querySelectorAll(".nav-link").forEach((link) => {
+    link.classList.toggle("active", link.getAttribute("href") === `#${active.id}`);
+  });
+}
+window.addEventListener("scroll", updateActiveNavigation, { passive: true });
+window.addEventListener("resize", updateActiveNavigation);
+updateActiveNavigation();
 
 initialize();

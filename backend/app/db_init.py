@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 
 from .database import SessionLocal, engine
 from .models import Base, DiningHall
@@ -17,6 +17,27 @@ DEFAULT_HALLS = [
 async def initialize_database() -> None:
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+        preference_columns = await connection.run_sync(
+            lambda sync_connection: {
+                column["name"]
+                for column in inspect(sync_connection).get_columns("user_preferences")
+            }
+        )
+        if "profile_data" not in preference_columns:
+            if connection.dialect.name == "postgresql":
+                await connection.execute(
+                    text(
+                        "ALTER TABLE user_preferences ADD COLUMN profile_data "
+                        "JSONB NOT NULL DEFAULT '{}'::jsonb"
+                    )
+                )
+            else:
+                await connection.execute(
+                    text(
+                        "ALTER TABLE user_preferences ADD COLUMN profile_data "
+                        "JSON NOT NULL DEFAULT '{}'"
+                    )
+                )
 
     async with SessionLocal() as session:
         existing = {

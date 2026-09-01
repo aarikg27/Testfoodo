@@ -25,6 +25,7 @@ from ..models import (
     UserPreference,
 )
 from ..schemas import (
+    BodyProfile,
     FavoriteCreate,
     FavoriteResponse,
     FoodLogCreate,
@@ -83,6 +84,7 @@ def preferences_response(preferences: UserPreference) -> PreferenceResponse:
         dietary_preferences=preferences.dietary_preferences or [],
         excluded_labels=preferences.excluded_labels or [],
         favorite_hall_id=preferences.favorite_hall_id,
+        profile=BodyProfile(**(preferences.profile_data or {})),
     )
 
 
@@ -176,6 +178,7 @@ async def update_preferences(
     preferences.dietary_preferences = dietary
     preferences.excluded_labels = excluded
     preferences.favorite_hall_id = payload.favorite_hall_id
+    preferences.profile_data = payload.profile.model_dump()
     await db.commit()
     return preferences_response(preferences)
 

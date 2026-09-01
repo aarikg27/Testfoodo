@@ -163,6 +163,10 @@ def best_plan(
 def build_recommendations(
     candidates: Sequence[Candidate], target: Target
 ) -> list[dict]:
+    if target.calories < 150 or (
+        target.protein_g < 5 and target.carbs_g < 5 and target.fat_g < 3
+    ):
+        return []
     plans = []
     meal_target = target
     if target.calories > 900:
@@ -199,11 +203,17 @@ def build_recommendations(
             continue
         signatures.add(signature)
         title, explanation_start = metadata[strategy]
-        protein_coverage = min(totals.protein_g / max(target.protein_g, 1) * 100, 999)
-        explanation = (
-            f"{explanation_start}; covers {protein_coverage:.0f}% of the remaining "
-            f"protein with {totals.calories:.0f} calories."
-        )
+        if target.protein_g < 1:
+            explanation = (
+                f"{explanation_start}; your protein target is already met, so this "
+                f"option emphasizes balance within {totals.calories:.0f} calories."
+            )
+        else:
+            protein_coverage = min(totals.protein_g / target.protein_g * 100, 999)
+            explanation = (
+                f"{explanation_start}; covers {protein_coverage:.0f}% of the remaining "
+                f"protein with {totals.calories:.0f} calories."
+            )
         plans.append(
             {
                 "strategy": strategy,

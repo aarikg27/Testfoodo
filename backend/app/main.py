@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .db_init import initialize_database
+from .menu_refresh import run_menu_refresh_loop, stop_menu_refresh
 from .routers import auth, foods, recommendations, users
 
 settings = get_settings()
@@ -16,7 +18,21 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     if settings.auto_create_schema:
         await initialize_database()
-    yield
+    refresh_stop = asyncio.Event()
+    refresh_loop = None
+    if settings.auto_refresh_menus:
+        refresh_loop = asyncio.create_task(
+            run_menu_refresh_loop(refresh_stop), name="testfoodo-menu-refresh-loop"
+        )
+    try:
+        yield
+    finally:
+        refresh_stop.set()
+        if refresh_loop is not None:
+            refresh_loop.cancel()
+            with suppress(asyncio.CancelledError):
+                await refresh_loop
+        await stop_menu_refresh()
 
 
 app = FastAPI(

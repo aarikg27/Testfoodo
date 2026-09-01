@@ -425,6 +425,24 @@ svg {
   border-radius: 50%;
 }
 
+.live-dot.pulse {
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  50% { opacity: 0.35; transform: scale(0.75); }
+}
+
+.macro-card.over-target {
+  border-color: color-mix(in srgb, var(--macro-color) 55%, var(--line));
+  box-shadow: inset 0 3px 0 var(--macro-color);
+}
+
+.macro-card.over-target .macro-copy > small {
+  color: #a10f24;
+  font-weight: 700;
+}
+
 .macro-ring {
   display: grid;
   width: 96px;
@@ -470,6 +488,29 @@ svg {
 .macro-copy small {
   color: var(--muted);
   font-size: 11px;
+}
+
+.nutrition-guidance {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.guidance-card {
+  padding: 14px 16px;
+  color: #5f3e07;
+  background: #fff8df;
+  border: 1px solid #f0d580;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.guidance-card strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #3d2a08;
 }
 
 .recommendation-band {
@@ -580,6 +621,18 @@ svg {
   padding-bottom: 8px;
   border-bottom: 1px solid #343434;
   font-size: 13px;
+}
+
+.portion-guide {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.recommendation-food .portion-guide {
+  color: #aaa8a4;
 }
 
 .recommendation-food span:last-child {
@@ -1298,6 +1351,45 @@ svg {
   border: 0;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+  opacity: 0.48;
+  transform: none !important;
+}
+
+.profile-group {
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.profile-fields .form-field:last-child {
+  grid-column: span 2;
+}
+
+.target-preview {
+  margin-top: 10px;
+  padding: 11px 13px;
+  color: var(--muted);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.target-preview.ready {
+  color: #164b2c;
+  background: #edf8f1;
+  border-color: #b8dfc5;
+}
+
 .choice-group legend {
   margin-bottom: 10px;
   color: var(--muted);
@@ -1387,6 +1479,7 @@ svg {
   .topbar { grid-template-columns: 1fr auto; }
   .hero { align-items: start; }
   .macro-grid { grid-template-columns: 1fr 1fr; }
+  .nutrition-guidance { grid-template-columns: 1fr; }
   .workspace-grid { grid-template-columns: minmax(0, 1fr) 310px; }
   .collection-grid { grid-template-columns: 1fr 1fr; }
   .history-card { grid-column: span 2; }
@@ -1435,6 +1528,8 @@ svg {
   .food-grid { grid-template-columns: 1fr; }
   .collection-card { min-height: 240px; }
   .goal-fields, .choice-grid { grid-template-columns: 1fr 1fr; }
+  .profile-fields { grid-template-columns: 1fr 1fr; }
+  .profile-fields .form-field:last-child { grid-column: span 2; }
   .modal-card { padding: 28px 20px 22px; }
   .footer .page-shell { flex-direction: column; }
 }
