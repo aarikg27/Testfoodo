@@ -1,0 +1,13 @@
+{
+  "name": "Testfoodo · UMD Nutrition Tracker",
+  "short_name": "Testfoodo",
+  "description": "Track UMD dining hall meals against your macro goals.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5f0",
+  "theme_color": "#111111",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
+

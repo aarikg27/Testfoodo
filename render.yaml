@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: testfoodo-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://testfoodo.pages.dev,http://localhost:5173,http://127.0.0.1:5173
+      - key: AUTO_CREATE_SCHEMA
+        value: true
+      - key: SESSION_DAYS
+        value: 30
+      - key: SCRAPER_CONCURRENCY
+        value: 6
+      - key: SCRAPER_USER_AGENT
+        value: Testfoodo/1.0 (UMD student nutrition tracker)
+

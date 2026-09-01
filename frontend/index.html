@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111111" />
+    <meta
+      name="description"
+      content="Track your dining hall macros and find meals that fit your goals at UMD."
+    />
+    <title>Testfoodo · UMD dining, made personal</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to dashboard</a>
+
+    <header class="topbar">
+      <a class="brand" href="#dashboard" aria-label="Testfoodo home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" role="img">
+            <path d="M8 24c0-8 5-14 12-14s12 6 12 14" />
+            <path d="M5 25h30M12 30h16" />
+            <circle cx="20" cy="7" r="2" />
+          </svg>
+        </span>
+        <span>test<span>foodo</span></span>
+      </a>
+
+      <nav class="main-nav" aria-label="Primary navigation">
+        <a class="nav-link active" href="#dashboard">Dashboard</a>
+        <a class="nav-link" href="#menu">Menu</a>
+        <a class="nav-link" href="#insights">Insights</a>
+      </nav>
+
+      <div class="topbar-actions">
+        <button class="icon-button" id="settings-button" aria-label="Dietary settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.82 2.82-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.04 1.55V21h-4v-.09A1.7 1.7 0 0 0 8.96 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.82-2.82.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1.04H3v-4h.09A1.7 1.7 0 0 0 4.6 8.92a1.7 1.7 0 0 0-.34-1.88L4.2 6.98l2.82-2.82.06.06a1.7 1.7 0 0 0 1.88.34H9A1.7 1.7 0 0 0 10 3.05V3h4v.09a1.7 1.7 0 0 0 1.04 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.82 2.82-.06.06A1.7 1.7 0 0 0 19.4 9v.04A1.7 1.7 0 0 0 20.95 10H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z" />
+          </svg>
+        </button>
+        <button class="profile-button" id="profile-button">
+          <span class="avatar" id="profile-avatar">G</span>
+          <span class="profile-copy">
+            <strong id="profile-name">Guest mode</strong>
+            <small id="profile-subtitle">Sign in to sync</small>
+          </span>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero page-shell" id="dashboard">
+        <div class="hero-copy">
+          <p class="eyebrow" id="today-label">TODAY</p>
+          <h1>Fuel the day,<br /><span>your way.</span></h1>
+          <p class="hero-description">
+            Your dining hall menu, measured against the goals that matter to you.
+          </p>
+        </div>
+
+        <div class="hero-controls" aria-label="Dashboard date and location">
+          <label class="control-field">
+            <span>Date</span>
+            <input type="date" id="date-filter" />
+          </label>
+          <label class="control-field">
+            <span>Dining hall</span>
+            <select id="hall-filter" aria-label="Dining hall">
+              <option value="">All dining halls</option>
+            </select>
+          </label>
+          <div class="freshness" id="freshness-status">
+            <span class="live-dot"></span>
+            <span>Connecting to menu…</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-shell macro-section" aria-labelledby="macro-title">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">DAILY PROGRESS</p>
+            <h2 id="macro-title">Your macro runway</h2>
+          </div>
+          <button class="text-button" id="edit-goals-button">
+            Edit goals
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 6 6-6 6" /></svg>
+          </button>
+        </div>
+        <div class="macro-grid" id="macro-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="recommendation-band" aria-labelledby="recommendation-title">
+        <div class="page-shell">
+          <div class="section-heading recommendation-heading">
+            <div>
+              <p class="eyebrow light">SMART PICKS</p>
+              <h2 id="recommendation-title">Close the gap deliciously.</h2>
+              <p>Meal combinations built around what you still need today.</p>
+            </div>
+            <button class="light-button" id="refresh-recommendations">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M16 6V2m0 0h-4m4 0-3 3a6 6 0 1 0 1.3 6.5" />
+              </svg>
+              Refresh picks
+            </button>
+          </div>
+          <div class="recommendation-grid" id="recommendation-grid" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="page-shell workspace-grid" id="menu">
+        <div class="menu-panel">
+          <div class="section-heading menu-heading">
+            <div>
+              <p class="eyebrow">WHAT'S SERVING</p>
+              <h2>Today’s menu</h2>
+            </div>
+            <span class="result-count" id="result-count">0 items</span>
+          </div>
+
+          <div class="filter-bar">
+            <div class="meal-tabs" id="meal-tabs" role="group" aria-label="Meal period">
+              <button class="meal-tab" data-meal="Breakfast">Breakfast</button>
+              <button class="meal-tab active" data-meal="Lunch">Lunch</button>
+              <button class="meal-tab" data-meal="Dinner">Dinner</button>
+            </div>
+            <label class="search-field">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <circle cx="9" cy="9" r="5.5" /><path d="m13 13 4 4" />
+              </svg>
+              <span class="sr-only">Search foods</span>
+              <input id="food-search" type="search" placeholder="Search the menu" />
+            </label>
+          </div>
+
+          <div class="active-filter-row" id="active-filters"></div>
+          <div class="food-grid" id="food-grid" aria-live="polite"></div>
+          <button class="load-more hidden" id="load-more-button">Show more foods</button>
+        </div>
+
+        <aside class="log-panel" aria-labelledby="log-title">
+          <div class="log-panel-header">
+            <div>
+              <p class="eyebrow">TODAY'S LOG</p>
+              <h2 id="log-title">What you’ve eaten</h2>
+            </div>
+            <span class="log-count" id="log-count">0</span>
+          </div>
+          <div class="log-list" id="log-list"></div>
+          <div class="log-empty" id="log-empty">
+            <span aria-hidden="true">＋</span>
+            <strong>Your plate is empty</strong>
+            <p>Add an item from the menu or one of your smart picks.</p>
+          </div>
+          <div class="log-totals" id="log-totals"></div>
+          <div class="log-actions">
+            <button class="secondary-button" id="custom-food-button">Add custom</button>
+            <button class="secondary-button" id="save-meal-button">Save meal</button>
+          </div>
+        </aside>
+      </section>
+
+      <section class="page-shell collection-grid" id="insights">
+        <article class="collection-card">
+          <div class="section-heading mini-heading">
+            <div>
+              <p class="eyebrow">QUICK ACCESS</p>
+              <h2>Favorites</h2>
+            </div>
+            <span aria-hidden="true">♥</span>
+          </div>
+          <div id="favorites-list" class="compact-list"></div>
+        </article>
+
+        <article class="collection-card history-card">
+          <div class="section-heading mini-heading">
+            <div>
+              <p class="eyebrow">LAST 7 DAYS</p>
+              <h2>Your rhythm</h2>
+            </div>
+            <span class="average-label" id="weekly-average">— kcal avg</span>
+          </div>
+          <div class="history-chart" id="history-chart" aria-label="Seven-day calorie history"></div>
+        </article>
+
+        <article class="collection-card">
+          <div class="section-heading mini-heading">
+            <div>
+              <p class="eyebrow">ONE-TAP MEALS</p>
+              <h2>Saved meals</h2>
+            </div>
+            <span aria-hidden="true">↗</span>
+          </div>
+          <div id="saved-meals-list" class="compact-list"></div>
+        </article>
+      </section>
+
+      <section class="notice page-shell" aria-label="Nutrition notice">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" /><path d="M12 10v6M12 7h.01" />
+        </svg>
+        <p>
+          Nutrition information is supplied by UMD Dining and should be treated as an
+          approximation. Always verify ingredients and allergens with dining staff.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="page-shell">
+        <span>Built for Terps who want a clearer plate.</span>
+        <a href="https://nutrition.umd.edu/" target="_blank" rel="noreferrer">UMD nutrition source ↗</a>
+      </div>
+    </footer>
+
+    <dialog class="modal" id="auth-modal">
+      <form method="dialog" class="modal-card" id="auth-form">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <span class="modal-icon">T</span>
+        <p class="eyebrow">WELCOME TO TESTFOODO</p>
+        <h2 id="auth-title">Sync your progress</h2>
+        <p class="modal-intro">Keep goals, logs, favorites, and saved meals on every device.</p>
+        <label class="form-field name-field hidden" id="name-field">
+          <span>Display name</span>
+          <input id="auth-name" autocomplete="name" maxlength="100" />
+        </label>
+        <label class="form-field">
+          <span>Email</span>
+          <input id="auth-email" type="email" autocomplete="email" required />
+        </label>
+        <label class="form-field">
+          <span>Password</span>
+          <input id="auth-password" type="password" autocomplete="current-password" required />
+          <small id="password-hint">Use your account password.</small>
+        </label>
+        <p class="form-error" id="auth-error" role="alert"></p>
+        <button class="primary-button wide" id="auth-submit" value="default">Sign in</button>
+        <button class="switch-auth" type="button" id="switch-auth">New here? Create an account</button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="goals-modal">
+      <form method="dialog" class="modal-card" id="goals-form">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <p class="eyebrow">DAILY TARGETS</p>
+        <h2>Set your macro goals</h2>
+        <div class="goal-fields">
+          <label class="form-field"><span>Calories</span><input id="goal-calories" type="number" min="1" max="10000" required /></label>
+          <label class="form-field"><span>Protein (g)</span><input id="goal-protein" type="number" min="1" max="1000" required /></label>
+          <label class="form-field"><span>Carbs (g)</span><input id="goal-carbs" type="number" min="1" max="1500" required /></label>
+          <label class="form-field"><span>Fat (g)</span><input id="goal-fat" type="number" min="1" max="500" required /></label>
+        </div>
+        <label class="check-row"><input id="save-default-goals" type="checkbox" checked /> Use these as my default targets</label>
+        <button class="primary-button wide" value="default">Save goals</button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="settings-modal">
+      <form method="dialog" class="modal-card wide-modal" id="settings-form">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <p class="eyebrow">PERSONALIZE YOUR MENU</p>
+        <h2>Dietary preferences</h2>
+        <fieldset class="choice-group">
+          <legend>Only show foods matching</legend>
+          <label class="choice-chip"><input type="checkbox" name="dietary" value="vegan" /> Vegan</label>
+          <label class="choice-chip"><input type="checkbox" name="dietary" value="vegetarian" /> Vegetarian</label>
+          <label class="choice-chip"><input type="checkbox" name="dietary" value="halal" /> Halal-friendly</label>
+        </fieldset>
+        <fieldset class="choice-group">
+          <legend>Exclude foods labeled with</legend>
+          <div class="choice-grid" id="exclusion-choices"></div>
+        </fieldset>
+        <button class="primary-button wide" value="default">Apply filters</button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="custom-food-modal">
+      <form method="dialog" class="modal-card" id="custom-food-form">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <p class="eyebrow">MANUAL ENTRY</p>
+        <h2>Add a custom food</h2>
+        <label class="form-field"><span>Name</span><input id="custom-name" maxlength="250" required /></label>
+        <div class="goal-fields">
+          <label class="form-field"><span>Calories</span><input id="custom-calories" type="number" min="0" required /></label>
+          <label class="form-field"><span>Protein (g)</span><input id="custom-protein" type="number" min="0" step="0.1" required /></label>
+          <label class="form-field"><span>Carbs (g)</span><input id="custom-carbs" type="number" min="0" step="0.1" required /></label>
+          <label class="form-field"><span>Fat (g)</span><input id="custom-fat" type="number" min="0" step="0.1" required /></label>
+        </div>
+        <button class="primary-button wide" value="default">Add to today</button>
+      </form>
+    </dialog>
+
+    <div class="toast-region" id="toast-region" aria-live="polite"></div>
+
+    <script src="config.js"></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
+
